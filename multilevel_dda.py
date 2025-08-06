@@ -416,7 +416,7 @@ def DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y, n, L,
 
                 # if still at initial t distance in axis: need to update
                 # BUT: always doing this causes some issues: maybe when next up to be incremented???
-                '''
+                
                 if initial_x:
                     # initial index (level l)
                     o_grid_y, o_grid_x = get_index(o_x, o_y, l_new, n)
@@ -433,8 +433,6 @@ def DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y, n, L,
                         t_y = (o_y - o_grid_y * s) * s_y
                     else:
                         t_y = ((o_grid_y + 1) * s - o_y) * s_y
-                '''
-
 
                 # draw blue square for no intersection
                 rect = pygame.Rect(grid_x * s * grid_pixel_x + 1, grid_y * s * grid_pixel_y + 1, grid_pixel_x * s - 2, grid_pixel_y * s - 2)
@@ -503,7 +501,6 @@ grid_list = multilevel_grid(grid, n, L)
 # grid size
 grid_max_y, grid_max_x = grid.shape
 
-'''
 # random grid
 tau = 0.8
 grid_max_y, grid_max_x = 16, 16
@@ -514,7 +511,6 @@ grid = rng.uniform(0, 1, (grid_max_y, grid_max_x))
 grid[grid < tau] = 0
 grid[grid >= tau] = 1
 grid_list = multilevel_grid(grid, n, L)
-'''
 
 # pixel size of grid squares
 grid_pixel_x = window_width // grid_max_x
