@@ -467,6 +467,360 @@ def DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y, n, L,
     # draw line from start to intersection
     pygame.draw.line(window, PINK, (o_x * grid_pixel_x, o_y * grid_pixel_y), ((o_x + t * r_x) * grid_pixel_x, (o_y + t * r_y) * grid_pixel_y), width=2)
 
+
+def compute_initial_dt(o_x, o_y, r_x, r_y, s_x, s_y, n, l):
+
+    # get index of origin (level l)
+    grid_y, grid_x = get_index(o_x, o_y, l, n)
+
+    # get scale
+    s = n ** l
+
+    # initial t distance (level l)
+    if r_x < 0:
+        step_x = -1
+        t_x = (o_x - grid_x * s) * s_x
+    else:
+        step_x = 1
+        t_x = ((grid_x + 1) * s - o_x) * s_x
+
+    if r_y < 0:
+        step_y = -1
+        t_y = (o_y - grid_y * s) * s_y
+    else:
+        step_y = 1
+        t_y = ((grid_y + 1) * s - o_y) * s_y
+
+    return t_x, t_y, step_x, step_y
+
+def compute_dt(s_x, s_y, n, l):
+
+    # get scale
+    s = n ** l
+
+    # t distance between each axis (level l)
+    dt_x = s * s_x
+    dt_y = s * s_y
+
+    return dt_x, dt_y
+
+def new_DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y, n, L, printing=False):
+    '''
+    Try to fix issues with wrong t values when changing level
+    '''
+
+    # cast ray until intersection
+    intersection = False
+    t_max = 1000.0
+    t = 0.0
+
+    # normalize direction
+    r_norm = np.sqrt(r_x**2 + r_y**2)
+    r_x = r_x / r_norm
+    r_y = r_y / r_norm
+
+    # axis scaling: account for zero divide in 1 / r_x & 1 / r_y
+    if r_x == 0:
+        s_x = np.inf
+    else:
+        s_x = 1 / abs(r_x)
+    if r_y == 0:
+        s_y = np.inf
+    else:
+        s_y = 1 / abs(r_y)
+
+    # start at highest level (??? or lowest l = 0 might be faster)
+    l = L
+
+    # find highest empty level and intial grid index
+    grid_y, grid_x, l = get_level(o_x, o_y, l, n, L, grid_list)
+
+    # cellsize (level l)
+    s = n ** l
+
+    # check initial square
+    if l == -1:
+
+        # flag intersection
+        intersection = True
+
+        # default cellsize
+        s = 1
+
+        # draw red square for intersection
+        rect = pygame.Rect(grid_x * grid_pixel_x + 1, grid_y * grid_pixel_y + 1, grid_pixel_x - 2, grid_pixel_y - 2)
+        pygame.draw.rect(window, RED, rect, 0)
+
+    else:
+
+        # draw blue square for no intersection
+        rect = pygame.Rect(grid_x * s * grid_pixel_x + 1, grid_y * s * grid_pixel_y + 1, s * grid_pixel_x - 2, s * grid_pixel_y - 2)
+        pygame.draw.rect(window, BLUE, rect, 0)
+
+    # t distance between each axis (level l)
+    dt_x, dt_y = compute_dt(s_x, s_y, n, l)
+
+    # initial t distance (level l)
+    t_x, t_y, step_x, step_y = compute_initial_dt(o_x, o_y, r_x, r_y, s_x, s_y, n, l) 
+
+    # flag initial distance (if axis has not moved beyond initial distance = True)
+    initial_x = True
+    initial_y = True
+
+    # draw dot at starting point
+    draw_dot(window, o_x, o_y, grid_pixel_x, grid_pixel_y)
+
+    if printing:
+        print(f"Start")
+        print(f"(x, y): ({o_x}, {o_y})")
+        print(f"(i, j): ({grid_y}, {grid_x})")
+        print(f"l: {l}")
+        print(f"t {t}")
+        print(f"t_x {t_x}")
+        print(f"t_y {t_y}")
+        print("")
+
+    while ((not intersection) and (t < t_max)):
+
+        # DDA step at level l
+
+        # select axis with smaller current t distance
+        if t_x < t_y:
+
+            # step in x axis to new grid sqaure
+            #grid_x += step_x
+
+            # store as current t distance (NOTE: before incrementing t_x, as need check the square we are entering)
+            t = t_x
+
+            # increment t_x
+            # t_x += dt_x
+            axis_x = True
+            initial_x = False
+
+        else:
+
+            # repeat for y axis
+            #grid_y += step_y
+            t = t_y
+            #t_y += dt_y
+            axis_x = False
+            initial_y = False
+
+        # get current position
+        x = o_x + t * r_x
+        y = o_y + t * r_y
+
+        # shift towards next square (avoid sitting on gridline???)
+        if axis_x:
+            x += step_x / 10**3
+        else:
+            y += step_y / 10**3
+
+        # find highest empty level and grid index
+        grid_y, grid_x, l_new = get_level(x, y, l, n, L, grid_list)
+
+        if printing:
+            print(f"(x, y): ({x}, {y})")
+            print(f"(i, j): ({grid_y}, {grid_x})")
+            print(f"l: {l_new}")
+            print(f"t {t}")
+            print(f"t_x {t_x}")
+            print(f"t_y {t_y}")
+            print("")
+
+        # no empty level: intersection
+        if l_new == -1:
+
+            intersection = True
+
+            # draw red square for intersection
+            rect = pygame.Rect(grid_x * grid_pixel_x + 1, grid_y * grid_pixel_y + 1, grid_pixel_x - 2, grid_pixel_y - 2)
+            pygame.draw.rect(window, RED, rect, 0)
+
+            # draw dot at grid intersection
+            draw_dot(window, o_x + t * r_x, o_y + t * r_y, grid_pixel_x, grid_pixel_y)
+
+            break
+
+        # get shape of new grid
+        grid_max_y, grid_max_x = grid_list[l_new].shape
+
+        # outside of grid: stop
+        if not((grid_x >= 0) and (grid_x < grid_max_x) and (grid_y >= 0) and (grid_y < grid_max_y)):
+
+            # draw dot at edge intersection
+            draw_dot(window, o_x + t * r_x, o_y + t * r_y, grid_pixel_x, grid_pixel_y)
+
+            break
+
+        # moving down level
+        if l_new < l:
+
+            print("Down")
+
+            # compute new dt
+            dt_x, dt_y = compute_dt(s_x, s_y, n, l_new)
+
+            # t_x moved
+            if axis_x:
+
+                # t_x was moved, so find t_y position (adjust)
+                x_old = o_x + t_y * r_x + step_x / 10**3
+                y_old = o_y + t_y * r_y
+
+                # compute index (level l_new)
+                grid_y_old, _ = get_index(x_old, y_old, l_new, n)
+
+                # difference in indices
+                diff_y = abs(grid_y - grid_y_old)
+                print(f"Y diff {diff_y}")
+
+                # still at intial t_y value: update
+                if initial_y:
+
+                    # compute in level l_new
+                    _, t_y_0, _, _ = compute_initial_dt(o_x, o_y, r_x, r_y, s_x, s_y, n, l_new)
+
+                    # set
+                    t_y = t_y_0 + (diff_y - 1) * dt_y
+
+                # otherwise: update increment
+                else:
+
+                    dt_y = diff_y * dt_y
+
+            # t_y moved
+            else:
+
+                # t_y was moved, so find t_x position (adjust)
+                x_old = o_x + t_x * r_x
+                y_old = o_y + t_x * r_y + step_y / 10**3
+
+                # compute index (level l_new)
+                _, grid_x_old = get_index(x_old, y_old, l_new, n)
+
+                # difference in indices
+                diff_x = abs(grid_x - grid_x_old)
+                print(f"X diff {diff_x}")
+
+                # still at intial t_x value: update
+                if initial_x:
+
+                    # compute in level l_new
+                    t_x_0, _, _, _ = compute_initial_dt(o_x, o_y, r_x, r_y, s_x, s_y, n, l_new)
+
+                    # set
+                    t_x = t_x_0 + (diff_x - 1) * dt_x
+
+                # otherwise: update increment
+                else:
+
+                    dt_x = diff_x * dt_x
+
+        # moving up level
+        elif l_new > l:
+            print("UP")
+
+            # get scaling
+            factor = n ** (l_new - l)
+            
+            # compute old dt
+            dt_x, dt_y = compute_dt(s_x, s_y, n, l)
+
+            # t_x moved
+            if axis_x:
+
+                # t_x was moved, so find t_y position (adjust)
+                x_old = o_x + t_y * r_x + step_x / 10**3
+                y_old = o_y + t_y * r_y
+
+                # compute index (level l)
+                grid_y_old, _ = get_index(x_old, y_old, l, n)
+
+                # difference in indices
+                diff_y = abs(grid_y * factor - grid_y_old)
+                print(f"Y diff {diff_y}")
+
+                # still at intial t_y value: update
+                if initial_y:
+
+                    # compute in level l
+                    _, t_y_0, _, _ = compute_initial_dt(o_x, o_y, r_x, r_y, s_x, s_y, n, l)
+
+                    # set
+                    t_y = t_y_0 + (diff_y - 1) * dt_y
+
+                # otherwise: update increment
+                else:
+
+                    dt_y = diff_y * dt_y
+
+            # t_y moved
+            else:
+
+                # t_y was moved, so find t_x position (adjust)
+                x_old = o_x + t_x * r_x
+                y_old = o_y + t_x * r_y + step_y / 10**3
+
+                # compute index (level l)
+                _, grid_x_old = get_index(x_old, y_old, l, n)
+
+                # difference in indices
+                diff_x = abs(grid_x * factor - grid_x_old)
+                print(f"X diff {diff_x}")
+
+                # still at intial t_x value: update
+                if initial_x:
+
+                    # compute in level l
+                    t_x_0, _, _, _ = compute_initial_dt(o_x, o_y, r_x, r_y, s_x, s_y, n, l)
+
+                    # set
+                    t_x = t_x_0 + (diff_x - 1) * dt_x
+
+                # otherwise: update increment
+                else:
+
+                    dt_x = diff_x * dt_x
+
+        # same level
+        else:
+
+            print("Same")
+            # ensure correct increment
+            dt_x, dt_y = compute_dt(s_x, s_y, n, l)
+
+        # increment chosen t
+        if axis_x:
+            t_x += dt_x
+        else:
+            t_y += dt_y
+
+        # adjust scale
+        s = n ** l_new
+
+        # update level
+        l = l_new
+
+        # draw blue square for no intersection
+        rect = pygame.Rect(grid_x * s * grid_pixel_x + 1, grid_y * s * grid_pixel_y + 1, grid_pixel_x * s - 2, grid_pixel_y * s - 2)
+        pygame.draw.rect(window, BLUE, rect, 0)
+
+        # draw dot at grid intersection
+        draw_dot(window, o_x + t * r_x, o_y + t * r_y, grid_pixel_x, grid_pixel_y)
+
+        if printing:
+            print(f"t {t}")
+            print(f"t_x {t_x}")
+            print(f"t_y {t_y}")
+            print("")
+
+    print("")
+
+    # draw line from start to intersection
+    pygame.draw.line(window, PINK, (o_x * grid_pixel_x, o_y * grid_pixel_y), ((o_x + t * r_x) * grid_pixel_x, (o_y + t * r_y) * grid_pixel_y), width=2)
+
 # -------------------------------------
 # Main
 # -------------------------------------
@@ -539,7 +893,7 @@ while True:
 
     draw_grid(window, grid, grid_max_x, grid_max_y, grid_pixel_x, grid_pixel_y)
 
-    DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y, n, L, printing=printing)
+    new_DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y, n, L, printing=printing)
 
     printing = False
 
