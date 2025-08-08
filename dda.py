@@ -218,9 +218,9 @@ grid = np.array([
 grid_max_y, grid_max_x = grid.shape
 
 # random grid
-tau = 0.8
-grid_max_y, grid_max_x = 20, 20
-rng = np.random.default_rng()
+tau = 0.9
+grid_max_y, grid_max_x = 16, 16
+rng = np.random.default_rng(0)
 grid = rng.uniform(0, 1, (grid_max_y, grid_max_x))
 grid[grid < tau] = 0
 grid[grid >= tau] = 1

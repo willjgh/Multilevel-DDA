@@ -1120,11 +1120,11 @@ grid_list = multilevel_grid(grid, n, L)
 grid_max_y, grid_max_x = grid.shape
 
 # random grid
-tau = 0.95
-grid_max_y, grid_max_x = 32, 32
+tau = 0.999
+grid_max_y, grid_max_x = 256, 256
 n = 2
-L = 5
-rng = np.random.default_rng(1)
+L = 8
+rng = np.random.default_rng(0)
 grid = rng.uniform(0, 1, (grid_max_y, grid_max_x))
 grid[grid < tau] = 0
 grid[grid >= tau] = 1
