@@ -10,7 +10,7 @@ from copy import copy
 # -------------------------------------
 
 # screen resolution
-window_width, window_height = 1000, 1000
+window_width, window_height = 1200, 1200
 
 # initialize pygame
 pygame.init()
@@ -821,6 +821,270 @@ def new_DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y, n
     # draw line from start to intersection
     pygame.draw.line(window, PINK, (o_x * grid_pixel_x, o_y * grid_pixel_y), ((o_x + t * r_x) * grid_pixel_x, (o_y + t * r_y) * grid_pixel_y), width=2)
 
+def newer_DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y, n, L, printing=False):
+    '''
+    Try to fix issues with wrong t values when changing level
+    '''
+
+    # cast ray until intersection
+    intersection = False
+    t_max = 1000.0
+    t = 0.0
+
+    # normalize direction
+    r_norm = np.sqrt(r_x**2 + r_y**2)
+    r_x = r_x / r_norm
+    r_y = r_y / r_norm
+
+    # axis scaling: account for zero divide in 1 / r_x & 1 / r_y
+    if r_x == 0:
+        s_x = np.inf
+    else:
+        s_x = 1 / abs(r_x)
+    if r_y == 0:
+        s_y = np.inf
+    else:
+        s_y = 1 / abs(r_y)
+
+    # start at highest level (??? or lowest l = 0 might be faster)
+    l = L
+
+    # find highest empty level and intial grid index
+    grid_y, grid_x, l = get_level(o_x, o_y, l, n, L, grid_list)
+
+    # cellsize (level l)
+    s = n ** l
+
+    # check initial square
+    if l == -1:
+
+        # flag intersection
+        intersection = True
+
+        # default cellsize
+        s = 1
+
+        # draw red square for intersection
+        rect = pygame.Rect(grid_x * grid_pixel_x + 1, grid_y * grid_pixel_y + 1, grid_pixel_x - 2, grid_pixel_y - 2)
+        pygame.draw.rect(window, RED, rect, 0)
+
+    else:
+
+        # draw blue square for no intersection
+        rect = pygame.Rect(grid_x * s * grid_pixel_x + 1, grid_y * s * grid_pixel_y + 1, s * grid_pixel_x - 2, s * grid_pixel_y - 2)
+        pygame.draw.rect(window, BLUE, rect, 0)
+
+    # t distance between each axis (level l)
+    dt_x, dt_y = compute_dt(s_x, s_y, n, l)
+
+    # initial t distance (level l)
+    t_x, t_y, step_x, step_y = compute_initial_dt(o_x, o_y, r_x, r_y, s_x, s_y, n, l) 
+
+    # flag initial distance (if axis has not moved beyond initial distance = True)
+    initial_x = True
+    initial_y = True
+
+    # draw dot at starting point
+    draw_dot(window, o_x, o_y, grid_pixel_x, grid_pixel_y)
+
+    if printing:
+        print(f"Start")
+        print(f"(x, y): ({o_x}, {o_y})")
+        print(f"(i, j): ({grid_y}, {grid_x})")
+        print(f"l: {l}")
+        print(f"t {t}")
+        print(f"t_x {t_x}")
+        print(f"t_y {t_y}")
+        print("")
+
+    while ((not intersection) and (t < t_max)):
+
+        # DDA step at level l
+
+        # select axis with smaller current t distance
+        if t_x < t_y:
+
+            # step in x axis to new grid sqaure
+            #grid_x += step_x
+
+            # store as current t distance (NOTE: before incrementing t_x, as need check the square we are entering)
+            t = t_x
+
+            # increment t_x
+            # t_x += dt_x
+            axis_x = True
+            initial_x = False
+
+        else:
+
+            # repeat for y axis
+            #grid_y += step_y
+            t = t_y
+            #t_y += dt_y
+            axis_x = False
+            initial_y = False
+
+        # get current position
+        x = o_x + t * r_x
+        y = o_y + t * r_y
+
+        # shift towards next square (avoid sitting on gridline???)
+        if axis_x:
+            x += step_x / 10**3
+        else:
+            y += step_y / 10**3
+
+        # find highest empty level and grid index
+        grid_y, grid_x, l_new = get_level(x, y, l, n, L, grid_list)
+
+        if printing:
+            print(f"(x, y): ({x}, {y})")
+            print(f"(i, j): ({grid_y}, {grid_x})")
+            print(f"l: {l_new}")
+            print(f"t {t}")
+            print(f"t_x {t_x}")
+            print(f"t_y {t_y}")
+            print("")
+
+        # no empty level: intersection
+        if l_new == -1:
+
+            intersection = True
+
+            # draw red square for intersection
+            rect = pygame.Rect(grid_x * grid_pixel_x + 1, grid_y * grid_pixel_y + 1, grid_pixel_x - 2, grid_pixel_y - 2)
+            pygame.draw.rect(window, RED, rect, 0)
+
+            # draw dot at grid intersection
+            draw_dot(window, o_x + t * r_x, o_y + t * r_y, grid_pixel_x, grid_pixel_y)
+
+            break
+
+        # get shape of new grid
+        grid_max_y, grid_max_x = grid_list[l_new].shape
+
+        # outside of grid: stop
+        if not((grid_x >= 0) and (grid_x < grid_max_x) and (grid_y >= 0) and (grid_y < grid_max_y)):
+
+            # draw dot at edge intersection
+            draw_dot(window, o_x + t * r_x, o_y + t * r_y, grid_pixel_x, grid_pixel_y)
+
+            break
+
+        # compute new dt (level l_new)
+        dt_x, dt_y = compute_dt(s_x, s_y, n, l_new)
+
+        if l_new < l:
+
+            '''Down level'''
+
+            # x moved
+            if axis_x:
+
+                # t_y may be too far ahead as moved in the higher level l
+                # know t_x < t_y (as x moved) and at edge of level l_new
+                # compute position of t_x and use to compute "initial" t distance from position to next y intersection (level l_new)
+                # set t_y = t_x + initial t_y (l_new)
+
+                # find t_x position
+                x_old = o_x + t_x * r_x #- step_x / 10**3
+                y_old = o_y + t_x * r_y #- step_y / 10**3
+
+                # compute initial t distance in level l_new
+                _, t_y_0, _, _ = compute_initial_dt(x_old, y_old, r_x, r_y, s_x, s_y, n, l_new)
+
+                # update t_y
+                t_y = t_x + t_y_0
+
+            # y moved
+            else:
+
+                # find t_y position
+                x_old = o_x + t_y * r_x #- step_x / 10**3
+                y_old = o_y + t_y * r_y #- step_y / 10**3
+
+                # compute initial t distance in level l_new
+                t_x_0, _, _, _ = compute_initial_dt(x_old, y_old, r_x, r_y, s_x, s_y, n, l_new)
+
+                # update t_x
+                t_x = t_y + t_x_0
+
+        elif l_new > l:
+
+            '''Up level'''
+
+            # t_x moved
+            if axis_x:
+
+                # t_y may now be in the centre of a level l_new square (as larger)
+                # so need to compute position and "intial" t distance from position to next intersection (level l_new)
+                # then add this to t_y
+
+                # t_x was moved, so find t_y position (adjust behind to prevent addition when not needed)
+                x_old = o_x + t_y * r_x #- step_x / 10**3
+                y_old = o_y + t_y * r_y #- step_y / 10**3
+
+                # compute initial t distance in level l_new
+                _, t_y_0, _, _ = compute_initial_dt(x_old, y_old, r_x, r_y, s_x, s_y, n, l_new)
+
+                # if equal to new dt_y: already on l_new intersection, no need to add
+                if t_y_0 == dt_y:
+                    # NOTE: might be issues here when very close / slightly off due to rounding
+                    pass
+                else:
+                    # add to t_y
+                    t_y += t_y_0
+
+            # t_y moved
+            else:
+
+                # t_y was moved, so find t_x position (adjust)
+                x_old = o_x + t_x * r_x #- step_x / 10**3
+                y_old = o_y + t_x * r_y #- step_y / 10**3
+
+                # compute initial t distance in level l_new
+                t_x_0, _, _, _ = compute_initial_dt(x_old, y_old, r_x, r_y, s_x, s_y, n, l_new)
+
+                # add to t_x
+                if t_x_0 == dt_x:
+                    pass
+                else:
+                    t_x += t_x_0
+
+        else:
+
+            '''same level'''
+
+            pass
+
+        # increment chosen t
+        if axis_x:
+            t_x += dt_x
+        else:
+            t_y += dt_y
+
+        # adjust scale
+        s = n ** l_new
+
+        # update level
+        l = l_new
+
+        # draw blue square for no intersection
+        rect = pygame.Rect(grid_x * s * grid_pixel_x + 1, grid_y * s * grid_pixel_y + 1, grid_pixel_x * s - 2, grid_pixel_y * s - 2)
+        pygame.draw.rect(window, BLUE, rect, 0)
+
+        # draw dot at grid intersection
+        draw_dot(window, o_x + t * r_x, o_y + t * r_y, grid_pixel_x, grid_pixel_y)
+
+        if printing:
+            print(f"t {t}")
+            print(f"t_x {t_x}")
+            print(f"t_y {t_y}")
+            print("")
+
+    # draw line from start to intersection
+    pygame.draw.line(window, PINK, (o_x * grid_pixel_x, o_y * grid_pixel_y), ((o_x + t * r_x) * grid_pixel_x, (o_y + t * r_y) * grid_pixel_y), width=2)
+
 # -------------------------------------
 # Main
 # -------------------------------------
@@ -856,14 +1120,15 @@ grid_list = multilevel_grid(grid, n, L)
 grid_max_y, grid_max_x = grid.shape
 
 # random grid
-tau = 0.8
-grid_max_y, grid_max_x = 16, 16
+tau = 0.95
+grid_max_y, grid_max_x = 32, 32
 n = 2
-L = 2
+L = 5
 rng = np.random.default_rng(1)
 grid = rng.uniform(0, 1, (grid_max_y, grid_max_x))
 grid[grid < tau] = 0
 grid[grid >= tau] = 1
+#grid[63:65, 63:65] = 1
 grid_list = multilevel_grid(grid, n, L)
 
 # pixel size of grid squares
@@ -893,7 +1158,7 @@ while True:
 
     draw_grid(window, grid, grid_max_x, grid_max_y, grid_pixel_x, grid_pixel_y)
 
-    new_DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y, n, L, printing=printing)
+    newer_DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y, n, L, printing=printing)
 
     printing = False
 
