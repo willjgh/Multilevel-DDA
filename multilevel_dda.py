@@ -884,6 +884,9 @@ def newer_DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y,
     initial_x = True
     initial_y = True
 
+    # flag axis
+    axis_x = False
+
     # draw dot at starting point
     draw_dot(window, o_x, o_y, grid_pixel_x, grid_pixel_y)
 
@@ -994,7 +997,8 @@ def newer_DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y,
                 _, t_y_0, _, _ = compute_initial_dt(x_old, y_old, r_x, r_y, s_x, s_y, n, l_new)
 
                 # update t_y
-                t_y = t_x + t_y_0
+                if not (t_y_0 == dt_y):
+                    t_y = t_x + t_y_0
 
             # y moved
             else:
@@ -1007,7 +1011,8 @@ def newer_DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y,
                 t_x_0, _, _, _ = compute_initial_dt(x_old, y_old, r_x, r_y, s_x, s_y, n, l_new)
 
                 # update t_x
-                t_x = t_y + t_x_0
+                if not (t_x_0 == dt_x):
+                    t_x = t_y + t_x_0
 
         elif l_new > l:
 
@@ -1028,10 +1033,9 @@ def newer_DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y,
                 _, t_y_0, _, _ = compute_initial_dt(x_old, y_old, r_x, r_y, s_x, s_y, n, l_new)
 
                 # if equal to new dt_y: already on l_new intersection, no need to add
-                if t_y_0 == dt_y:
-                    # NOTE: might be issues here when very close / slightly off due to rounding
-                    pass
-                else:
+                if not (t_y_0 == dt_y):
+                    # NOTE: might be issues here
+
                     # add to t_y
                     t_y += t_y_0
 
@@ -1046,9 +1050,7 @@ def newer_DDA(window, grid_list, grid_pixel_x, grid_pixel_y, o_x, o_y, r_x, r_y,
                 t_x_0, _, _, _ = compute_initial_dt(x_old, y_old, r_x, r_y, s_x, s_y, n, l_new)
 
                 # add to t_x
-                if t_x_0 == dt_x:
-                    pass
-                else:
+                if not (t_x_0 == dt_x):
                     t_x += t_x_0
 
         else:
@@ -1120,10 +1122,10 @@ grid_list = multilevel_grid(grid, n, L)
 grid_max_y, grid_max_x = grid.shape
 
 # random grid
-tau = 0.9
-grid_max_y, grid_max_x = 16, 16
+tau = 0.99
+grid_max_y, grid_max_x = 64, 64
 n = 2
-L = 0
+L = 6
 rng = np.random.default_rng(0)
 grid = rng.uniform(0, 1, (grid_max_y, grid_max_x))
 grid[grid < tau] = 0
