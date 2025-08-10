@@ -14,3 +14,13 @@ Examples of the algorithm (without / with multilevel grid):
 </p>
 
 The first level of the grid is stored as an array with empty cells as 0 and full squares as 1. Given a scale factor $n$, $n \times n$ slices of the grid are stored as a single value in the next level array: $1$ if the slice contains at least one $1$ entry, otherwise $0$. At each step of the DDA algorithm the highest grid level that is empty at the current position is used to step the ray, iterating until no empty level can be found i.e. intersection with the original grid.
+
+## Voxel Raytracing
+
+A nice application of the algorithm is for voxel raytracing
+
+<p align "center">
+<img src="Images/voxel_raytracing_example.png" width="800">
+</p>
+
+Despite the efficient algorithm realtime raytracing is obviously very slow using python (via pygame)
